@@ -1,0 +1,8 @@
+<launch>
+	<node 
+		name="fhu_control"
+		pkg="fhu_auto" type="door_auto.py"
+		output="screen" 
+ 	/>
+ 	<include file="$(find rosbridge_server)/launch/rosbridge_websocket.launch" />
+</launch>
