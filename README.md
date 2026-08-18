@@ -8,7 +8,7 @@ the Raspberry Pi GPIO pins, and exposes a web UI plus a simple HTTP/JSON API.
 
 ## Requirements
 
-* Python 3.7+
+* Python 3.5+
 * A Raspberry Pi with the two relay channels wired to the GPIO pins
   configured in `app.py` (default: GPIO19 for up, GPIO26 for down).
 

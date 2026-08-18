@@ -43,7 +43,7 @@ except (ImportError, RuntimeError):
             pass
 
         def output(self, pin, value):
-            print(f'[mock GPIO] pin {pin} -> {value}')
+            print('[mock GPIO] pin {} -> {}'.format(pin, value))
 
         def cleanup(self):
             pass
@@ -121,7 +121,7 @@ def _status():
         busy = _busy
         direction = _direction
     if busy:
-        message = f"{'Raising' if direction == 'up' else 'Lowering'} the gate..."
+        message = '{} the gate...'.format('Raising' if direction == 'up' else 'Lowering')
     else:
         message = 'Ready'
     return {'busy': busy, 'direction': direction, 'message': message}
@@ -171,5 +171,5 @@ def api_stop():
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
-    print(f'Starting gate-control Flask app on http://0.0.0.0:{port}')
+    print('Starting gate-control Flask app on http://0.0.0.0:{}'.format(port))
     app.run(host='0.0.0.0', port=port)
