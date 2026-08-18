@@ -1,0 +1,154 @@
+:root {
+  --up-color: #27ae60;
+  --down-color: #c0392b;
+  --stop-color: #e67e22;
+  --bg-color: #f0f4f8;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  margin: 0;
+  padding: 1rem;
+  background: var(--bg-color);
+}
+
+h1 {
+  margin-bottom: 1.5rem;
+  color: #333;
+  text-align: center;
+}
+
+.buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  justify-content: center;
+  width: 100%;
+  max-width: 480px;
+}
+
+button {
+  padding: 1.25rem 2rem;
+  font-size: 1.3rem;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  color: #fff;
+  transition: opacity 0.2s;
+  min-width: 140px;
+  flex: 1 1 140px;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.up { background: var(--up-color); }
+.down { background: var(--down-color); }
+.stop { background: var(--stop-color); }
+
+.status {
+  margin-top: 2rem;
+  font-size: 1.1rem;
+  color: #555;
+  min-height: 1.5em;
+  text-align: center;
+}
+
+/* ── Modal ─────────────────────────────────────────────────────────── */
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  z-index: 1000;
+}
+
+.modal-backdrop.hidden {
+  display: none;
+}
+
+.modal {
+  background: #fff;
+  border-radius: 12px;
+  padding: 1.5rem;
+  max-width: 420px;
+  width: 100%;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+
+.modal h2 {
+  margin-top: 0;
+}
+
+.modal .warning {
+  background: #fff3cd;
+  border: 1px solid #ffe08a;
+  border-radius: 8px;
+  padding: 0.75rem;
+  color: #7a5b00;
+  font-weight: 600;
+}
+
+.modal-buttons {
+  display: flex;
+  gap: 1rem;
+  margin-top: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.modal-buttons button {
+  flex: 1 1 140px;
+  min-width: 140px;
+}
+
+.cancel {
+  background: #7f8c8d;
+}
+
+.confirm {
+  background: #2c3e50;
+  position: relative;
+  overflow: hidden;
+}
+
+.confirm .confirm-progress {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 0%;
+  background: rgba(255, 255, 255, 0.35);
+  transition: width linear;
+  pointer-events: none;
+}
+
+.confirm .confirm-label {
+  position: relative;
+  z-index: 1;
+}
+
+@media (max-width: 480px) {
+  .buttons {
+    flex-direction: column;
+  }
+  button {
+    width: 100%;
+  }
+}

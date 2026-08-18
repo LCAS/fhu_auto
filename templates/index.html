@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <title>Gate Control</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <h1>Gate Control</h1>
+
+  <div class="buttons">
+    <button id="btn-up" class="up" data-action="up" data-label="raise">&#8679; Up</button>
+    <button id="btn-down" class="down" data-action="down" data-label="lower">&#8681; Down</button>
+    <button id="btn-stop" class="stop" data-action="stop">&#9632; Stop</button>
+  </div>
+
+  <p id="status" class="status">Ready</p>
+
+  <!-- Confirmation modal -->
+  <div id="modal-backdrop" class="modal-backdrop hidden">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <h2 id="modal-title">Confirm gate movement</h2>
+      <p class="warning">
+        &#9888; Warning: only operate this gate if you have checked that it is
+        safe to do so. Make sure the area around the gate is clear of people
+        and obstacles before continuing.
+      </p>
+      <p id="modal-action-text"></p>
+      <div class="modal-buttons">
+        <button id="modal-cancel" class="cancel" type="button">Cancel</button>
+        <button id="modal-confirm" class="confirm" type="button">
+          <span class="confirm-label">Press and hold to confirm (2s)</span>
+          <span class="confirm-progress"></span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>

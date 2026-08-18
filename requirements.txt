@@ -1,0 +1,2 @@
+Flask>=1.0
+RPi.GPIO>=0.7.1; platform_machine == "armv7l" or platform_machine == "armv6l" or platform_machine == "aarch64"
