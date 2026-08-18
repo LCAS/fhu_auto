@@ -19,6 +19,7 @@ GPIO.output(up_gpio, GPIO.HIGH)
 GPIO.output(down_gpio, GPIO.HIGH)
 
 def callback(msg):
+	rospy.loginfo(msg.data)
 	if msg.data == 'up':
 		GPIO.output(down_gpio, GPIO.HIGH)
 		GPIO.output(up_gpio, GPIO.LOW)
@@ -42,7 +43,11 @@ def callback(msg):
 
 def listener():
 	rospy.init_node('door')
+	rospy.loginfo('door_auto begun')
 	rospy.Subscriber('command', String, callback)
+	import time
+	time.sleep(5)
+	callback(String(data='up'))
 	rospy.spin()
 
 	# Safely shutdown GPIO
