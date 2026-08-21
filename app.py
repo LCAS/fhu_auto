@@ -14,26 +14,36 @@ GET  /api/status  JSON status of the gate: {"busy": bool, "direction":
                    "up"|"down"|"stop"|null, "last_command_time": str|null,
                    "likely_state": "open"|"closed"|"unknown", "history":
                    [{"command": str, "time": str}, ...] (newest first,
-                   last 10 commands).
-POST /api/up      Start raising the gate. Returns 409 if a move is
-                   already in progress.
-POST /api/down     Start lowering the gate. Returns 409 if a move is
-                   already in progress.
+                   last 10 commands), "geofence": {"lat": float, "lon":
+                   float, "radius_m": float}.
+POST /api/up      Start raising the gate. Requires the client's location
+                   (see geofencing below). Returns 409 if a move is
+                   already in progress, 403 if outside the geofence.
+POST /api/down     Start lowering the gate. Same location requirement as
+                   /api/up.
 POST /api/stop     Immediately stop any door movement and release the
-                   relays. Always returns 200.
+                   relays. Always allowed: never geofenced, never blocked.
 
 Every command is also appended, with its timestamp, to a local log file
 (see LOG_FILE below).
+
+Geofencing
+----------
+Up/down requests must include a JSON body {"lat": float, "lon": float}
+with the client's current position. The request is rejected (403) unless
+that position is within GEOFENCE_RADIUS_M metres of (GATE_LAT, GATE_LON).
+The stop endpoint is exempt from this check.
 """
 
 import atexit
 import logging
+import math
 import os
 import threading
 from collections import deque
 from datetime import datetime, timezone
 
-from flask import Flask, jsonify, render_template
+from flask import Flask, jsonify, render_template, request
 
 try:
     import RPi.GPIO as GPIO
@@ -65,6 +75,12 @@ app = Flask(__name__)
 UP_GPIO = int(os.environ.get('UP_GPIO', 19))
 DOWN_GPIO = int(os.environ.get('DOWN_GPIO', 26))
 DOOR_TIME = float(os.environ.get('DOOR_TIME', 17))  # seconds
+
+# Geofencing: the gate's position and the radius (in metres) within which
+# a client is allowed to operate it.
+GATE_LAT = float(os.environ.get('GATE_LAT', 53.268684))
+GATE_LON = float(os.environ.get('GATE_LON', -0.524170))
+GEOFENCE_RADIUS_M = float(os.environ.get('GEOFENCE_RADIUS_M', 50))
 
 # Protects access to the shared state below.
 _lock = threading.Lock()
@@ -182,7 +198,37 @@ def _status():
         'last_command_time': last_command_time,
         'likely_state': likely_state,
         'history': history,
+        'geofence': {'lat': GATE_LAT, 'lon': GATE_LON, 'radius_m': GEOFENCE_RADIUS_M},
     }
+
+
+# ── Geofencing ───────────────────────────────────────────────────────────────
+
+def _distance_m(lat1, lon1, lat2, lon2):
+    """Great-circle distance between two WGS84 points, in metres."""
+    earth_radius_m = 6371000.0
+    phi1, phi2 = math.radians(lat1), math.radians(lat2)
+    dphi = math.radians(lat2 - lat1)
+    dlambda = math.radians(lon2 - lon1)
+    a = math.sin(dphi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(dlambda / 2) ** 2
+    return 2 * earth_radius_m * math.asin(math.sqrt(a))
+
+
+def _geofence_error(payload):
+    """Return an error message if *payload* lacks a valid, in-range location."""
+    if not payload or 'lat' not in payload or 'lon' not in payload:
+        return 'Your location is required to operate the gate.'
+    try:
+        lat = float(payload['lat'])
+        lon = float(payload['lon'])
+    except (TypeError, ValueError):
+        return 'Invalid location.'
+    distance = _distance_m(lat, lon, GATE_LAT, GATE_LON)
+    if distance > GEOFENCE_RADIUS_M:
+        return 'You must be within {:.0f}m of the gate to operate it (you are {:.0f}m away).'.format(
+            GEOFENCE_RADIUS_M, distance
+        )
+    return None
 
 
 # ── Routes ───────────────────────────────────────────────────────────────────
@@ -199,6 +245,9 @@ def api_status():
 
 @app.route('/api/up', methods=['POST'])
 def api_up():
+    geofence_error = _geofence_error(request.get_json(silent=True))
+    if geofence_error:
+        return jsonify({**_status(), 'error': geofence_error}), 403
     if not _start_move(UP_GPIO, DOWN_GPIO, 'up'):
         return jsonify({**_status(), 'error': 'A move is already in progress.'}), 409
     return jsonify(_status())
@@ -206,6 +255,9 @@ def api_up():
 
 @app.route('/api/down', methods=['POST'])
 def api_down():
+    geofence_error = _geofence_error(request.get_json(silent=True))
+    if geofence_error:
+        return jsonify({**_status(), 'error': geofence_error}), 403
     if not _start_move(DOWN_GPIO, UP_GPIO, 'down'):
         return jsonify({**_status(), 'error': 'A move is already in progress.'}), 409
     return jsonify(_status())
@@ -214,6 +266,7 @@ def api_down():
 @app.route('/api/stop', methods=['POST'])
 def api_stop():
     global _busy, _direction, _last_command, _last_command_time, _likely_state
+    # Stop is a safety action and is never geofenced or blocked.
     # Signal the running relay thread to stop waiting; also make sure the
     # relays are released immediately, regardless of thread state.
     _stop_event.set()

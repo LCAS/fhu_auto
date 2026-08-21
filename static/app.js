@@ -13,6 +13,11 @@ const downBtn = document.getElementById('btn-down');
 const stopBtn = document.getElementById('btn-stop');
 const modalStopBtn = document.getElementById('modal-stop');
 const historyList = document.getElementById('history-list');
+const geofenceStatusEl = document.getElementById('geofence-status');
+
+// Whether the client is known to be within range of the gate; null while
+// unknown/unchecked. Up/Down are only enabled once this is true.
+let geofenceOk = null;
 
 let pendingAction = null;
 let holdTimer = null;
@@ -83,24 +88,86 @@ backdrop.addEventListener('click', (e) => {
 upBtn.addEventListener('click', () => openModal('up', 'raise'));
 downBtn.addEventListener('click', () => openModal('down', 'lower'));
 
-// Stop is a safety action: no confirmation dialog, fire immediately. It is
-// also available inside the modal, so a move can be interrupted without
-// needing to dismiss the confirmation dialog first.
+// Stop is a safety action: no confirmation dialog, no location check, fire
+// immediately. It is also available inside the modal, so a move can be
+// interrupted without needing to dismiss the confirmation dialog first.
 function stopNow() {
   closeModal();
-  performAction('stop');
+  performStop();
 }
 
 stopBtn.addEventListener('click', stopNow);
 modalStopBtn.addEventListener('click', stopNow);
 
-async function performAction(action) {
+async function performStop() {
   try {
-    const resp = await fetch(`/api/${action}`, { method: 'POST' });
+    const resp = await fetch('/api/stop', { method: 'POST' });
     const data = await resp.json();
     updateStatus(data);
   } catch (err) {
     statusEl.textContent = 'Error contacting the gate controller.';
+  }
+}
+
+async function performAction(action) {
+  try {
+    const position = await getPosition();
+    const resp = await fetch(`/api/${action}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(position),
+    });
+    const data = await resp.json();
+    updateStatus(data);
+  } catch (err) {
+    statusEl.textContent = err.message || 'Error contacting the gate controller.';
+  }
+}
+
+// The gate is geofenced server-side; the client's location must be sent
+// with every up/down command so the server can check it is close enough.
+function getPosition() {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) {
+      reject(new Error('Geolocation is not supported by this browser.'));
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => resolve({ lat: pos.coords.latitude, lon: pos.coords.longitude }),
+      () => reject(new Error('Unable to determine your location. Enable location access to operate the gate.')),
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 10000 }
+    );
+  });
+}
+
+function distanceMeters(lat1, lon1, lat2, lon2) {
+  const earthRadiusM = 6371000;
+  const toRad = (deg) => (deg * Math.PI) / 180;
+  const dPhi = toRad(lat2 - lat1);
+  const dLambda = toRad(lon2 - lon1);
+  const a = Math.sin(dPhi / 2) ** 2
+    + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLambda / 2) ** 2;
+  return 2 * earthRadiusM * Math.asin(Math.sqrt(a));
+}
+
+// Checked once on load: fetches the gate's geofence config, gets the
+// client's position, and enables/disables Up/Down accordingly.
+async function checkGeofence() {
+  try {
+    const resp = await fetch('/api/status');
+    const data = await resp.json();
+    const { lat, lon, radius_m: radiusM } = data.geofence;
+    const position = await getPosition();
+    const distance = distanceMeters(position.lat, position.lon, lat, lon);
+    geofenceOk = distance <= radiusM;
+    geofenceStatusEl.textContent = geofenceOk
+      ? `You are ${Math.round(distance)}m from the gate – within range to operate Up/Down.`
+      : `You are ${Math.round(distance)}m from the gate – must be within ${radiusM}m to operate Up/Down.`;
+    updateStatus(data);
+  } catch (err) {
+    geofenceOk = false;
+    geofenceStatusEl.textContent = err.message || 'Unable to determine your location; Up/Down are disabled.';
+    updateStatus({ busy: false, message: 'Ready' });
   }
 }
 
@@ -113,8 +180,8 @@ function updateStatus(data) {
   }
   statusEl.textContent = message;
   const busy = !!data.busy;
-  upBtn.disabled = busy;
-  downBtn.disabled = busy;
+  upBtn.disabled = busy || geofenceOk !== true;
+  downBtn.disabled = busy || geofenceOk !== true;
   renderHistory(data.history);
 }
 
@@ -141,3 +208,4 @@ async function pollStatus() {
 
 pollStatus();
 setInterval(pollStatus, 2000);
+checkGeofence();
