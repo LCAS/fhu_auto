@@ -11,6 +11,8 @@ const confirmProgress = confirmBtn.querySelector('.confirm-progress');
 const upBtn = document.getElementById('btn-up');
 const downBtn = document.getElementById('btn-down');
 const stopBtn = document.getElementById('btn-stop');
+const modalStopBtn = document.getElementById('modal-stop');
+const historyList = document.getElementById('history-list');
 
 let pendingAction = null;
 let holdTimer = null;
@@ -81,8 +83,16 @@ backdrop.addEventListener('click', (e) => {
 upBtn.addEventListener('click', () => openModal('up', 'raise'));
 downBtn.addEventListener('click', () => openModal('down', 'lower'));
 
-// Stop is a safety action: no confirmation dialog, fire immediately.
-stopBtn.addEventListener('click', () => performAction('stop'));
+// Stop is a safety action: no confirmation dialog, fire immediately. It is
+// also available inside the modal, so a move can be interrupted without
+// needing to dismiss the confirmation dialog first.
+function stopNow() {
+  closeModal();
+  performAction('stop');
+}
+
+stopBtn.addEventListener('click', stopNow);
+modalStopBtn.addEventListener('click', stopNow);
 
 async function performAction(action) {
   try {
@@ -94,11 +104,29 @@ async function performAction(action) {
   }
 }
 
+const LIKELY_STATE_LABELS = { open: 'likely open', closed: 'likely closed', unknown: 'position unknown' };
+
 function updateStatus(data) {
-  statusEl.textContent = data.error ? data.error : data.message;
+  let message = data.error ? data.error : data.message;
+  if (!data.busy && data.likely_state) {
+    message += ` (${LIKELY_STATE_LABELS[data.likely_state] || data.likely_state})`;
+  }
+  statusEl.textContent = message;
   const busy = !!data.busy;
   upBtn.disabled = busy;
   downBtn.disabled = busy;
+  renderHistory(data.history);
+}
+
+function renderHistory(history) {
+  if (!Array.isArray(history)) return;
+  historyList.innerHTML = '';
+  history.forEach((entry) => {
+    const li = document.createElement('li');
+    const time = new Date(entry.time).toLocaleString();
+    li.textContent = `${entry.command} – ${time}`;
+    historyList.appendChild(li);
+  });
 }
 
 async function pollStatus() {

@@ -59,12 +59,43 @@ button:disabled {
 .down { background: var(--down-color); }
 .stop { background: var(--stop-color); }
 
+.modal-stop {
+  width: 100%;
+  margin-top: 1rem;
+}
+
 .status {
   margin-top: 2rem;
   font-size: 1.1rem;
   color: #555;
   min-height: 1.5em;
   text-align: center;
+}
+
+.history {
+  margin-top: 1.5rem;
+  width: 100%;
+  max-width: 480px;
+}
+
+.history h2 {
+  font-size: 1rem;
+  color: #555;
+  margin-bottom: 0.5rem;
+  text-align: center;
+}
+
+.history ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 0.9rem;
+  color: #666;
+}
+
+.history li {
+  padding: 0.4rem 0.6rem;
+  border-bottom: 1px solid #dde3ea;
 }
 
 /* ── Modal ─────────────────────────────────────────────────────────── */

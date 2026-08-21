@@ -7,15 +7,20 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-  <h1>Gate Control</h1>
+  <h1>FHU Gate Control</h1>
 
   <div class="buttons">
     <button id="btn-up" class="up" data-action="up" data-label="raise">&#8679; Up</button>
-    <button id="btn-down" class="down" data-action="down" data-label="lower">&#8681; Down</button>
     <button id="btn-stop" class="stop" data-action="stop">&#9632; Stop</button>
+    <button id="btn-down" class="down" data-action="down" data-label="lower">&#8681; Down</button>
   </div>
 
   <p id="status" class="status">Ready</p>
+
+  <div class="history">
+    <h2>Recent commands</h2>
+    <ul id="history-list"></ul>
+  </div>
 
   <!-- Confirmation modal -->
   <div id="modal-backdrop" class="modal-backdrop hidden">
@@ -34,6 +39,7 @@
           <span class="confirm-progress"></span>
         </button>
       </div>
+      <button id="modal-stop" class="stop modal-stop" type="button">&#9632; Stop</button>
     </div>
   </div>
 
