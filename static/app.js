@@ -209,3 +209,15 @@ async function pollStatus() {
 pollStatus();
 setInterval(pollStatus, 2000);
 checkGeofence();
+
+// Register the service worker so the app can be installed as a PWA and
+// the static shell is available offline. Gate commands/status always hit
+// the network (see sw.js), so this only affects load speed/installability.
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch((err) => {
+      console.error('Service worker registration failed:', err);
+    });
+  });
+}
+

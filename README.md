@@ -73,6 +73,18 @@ hardware) and a "Recent commands" list with the last 10 commands issued.
 
 The UI is responsive and usable on both desktop and mobile screens.
 
+### Installing as an app (PWA)
+
+The web UI is a Progressive Web App: most modern browsers (Chrome, Edge,
+Safari, etc.) will offer to "Install" or "Add to Home Screen" when visiting
+the page, giving it an icon, a standalone window (no browser chrome), and
+fast reloads of the static UI shell via a service worker. Gate status and
+commands always go straight to the server and are never served from cache
+or available offline, since this controls physical hardware.
+
+Like geolocation, installability and the service worker require a secure
+origin (HTTPS or `localhost`); see the note below about serving over HTTPS.
+
 Note: browsers only expose geolocation on secure origins (HTTPS or
 `localhost`), so serving the app over plain HTTP on the LAN may prevent
 Up/Down from ever becoming available in the field unless TLS is set up.
