@@ -9,6 +9,8 @@ mobile-friendly web UI.
 API
 ---
 GET  /            HTML control page.
+GET  /sw.js       Service worker script (root-scoped, enables installing
+                   the page as a Progressive Web App).
 GET  /api/status  JSON status of the gate: {"busy": bool, "direction":
                    "up"|"down"|null, "message": str, "last_command":
                    "up"|"down"|"stop"|null, "last_command_time": str|null,
@@ -43,7 +45,7 @@ import threading
 from collections import deque
 from datetime import datetime, timezone
 
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, jsonify, render_template, request, send_from_directory
 
 try:
     import RPi.GPIO as GPIO
@@ -236,6 +238,15 @@ def _geofence_error(payload):
 @app.route('/', methods=['GET'])
 def index():
     return render_template('index.html')
+
+
+@app.route('/sw.js', methods=['GET'])
+def service_worker():
+    # Served from the root (rather than /static/sw.js) so its default scope
+    # covers the whole app instead of just the /static/ path.
+    response = send_from_directory(app.static_folder, 'sw.js')
+    response.headers['Service-Worker-Allowed'] = '/'
+    return response
 
 
 @app.route('/api/status', methods=['GET'])
