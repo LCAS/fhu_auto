@@ -88,7 +88,7 @@ GEOFENCE_RADIUS_M = float(os.environ.get('GEOFENCE_RADIUS_M', 50))
 _lock = threading.Lock()
 _busy = False
 _direction = None  # 'up' or 'down' while a move is in progress
-_stop_event = threading.Event()
+_stop_event = threading.Event()  # replaced per move so a stale thread can't see a newer move's event
 
 # Last command issued and the gate position it implies, since the actual
 # door position cannot be read back from hardware.
@@ -120,8 +120,11 @@ def _log_command(command):
 # ── GPIO initialisation ─────────────────────────────────────────────────────
 
 GPIO.setmode(GPIO.BCM)
-GPIO.setup(UP_GPIO, GPIO.OUT)
-GPIO.setup(DOWN_GPIO, GPIO.OUT)
+# Drive the pins HIGH (relay off) as part of setup. The relays are active-low,
+# so a pin configured as an output *without* an initial level defaults LOW and
+# would briefly energise the relay (moving the gate) on every app (re)start.
+GPIO.setup(UP_GPIO, GPIO.OUT, initial=GPIO.HIGH)
+GPIO.setup(DOWN_GPIO, GPIO.OUT, initial=GPIO.HIGH)
 GPIO.output(UP_GPIO, GPIO.HIGH)    # relay off
 GPIO.output(DOWN_GPIO, GPIO.HIGH)  # relay off
 
@@ -130,7 +133,7 @@ atexit.register(GPIO.cleanup)
 
 # ── GPIO helpers ─────────────────────────────────────────────────────────────
 
-def _run_relay(active_pin, idle_pin, duration):
+def _run_relay(active_pin, idle_pin, duration, stop_event, direction):
     """Energise *active_pin* for up to *duration* seconds then release it.
 
     The move can be interrupted early by setting ``_stop_event``.
@@ -142,17 +145,19 @@ def _run_relay(active_pin, idle_pin, duration):
         GPIO.output(active_pin, GPIO.LOW)
 
         # Wait in small increments so a stop request is honoured quickly.
-        completed = not _stop_event.wait(duration)
-
-        GPIO.output(active_pin, GPIO.HIGH)
+        completed = not stop_event.wait(duration)
     finally:
-        GPIO.output(active_pin, GPIO.HIGH)
-        GPIO.output(idle_pin, GPIO.HIGH)
         with _lock:
+            # If this move was superseded (stopped, then a new move started),
+            # it must not touch the relays or state belonging to the new move.
+            if _stop_event is not stop_event:
+                return
+            GPIO.output(active_pin, GPIO.HIGH)
+            GPIO.output(idle_pin, GPIO.HIGH)
             # Only a move that ran for its full duration reliably reaches
             # the end stop; anything interrupted leaves the position unknown.
             if completed:
-                _likely_state = 'open' if _direction == 'up' else 'closed'
+                _likely_state = 'open' if direction == 'up' else 'closed'
             else:
                 _likely_state = 'unknown'
             _busy = False
@@ -160,7 +165,7 @@ def _run_relay(active_pin, idle_pin, duration):
 
 
 def _start_move(active_pin, idle_pin, direction):
-    global _busy, _direction, _last_command, _last_command_time
+    global _busy, _direction, _last_command, _last_command_time, _stop_event
     with _lock:
         if _busy:
             return False
@@ -168,12 +173,12 @@ def _start_move(active_pin, idle_pin, direction):
         _direction = direction
         _last_command = direction
         _last_command_time = datetime.now(timezone.utc).isoformat()
-        _stop_event.clear()
+        _stop_event = stop_event = threading.Event()
 
     _log_command(direction)
     thread = threading.Thread(
         target=_run_relay,
-        args=(active_pin, idle_pin, DOOR_TIME),
+        args=(active_pin, idle_pin, DOOR_TIME, stop_event, direction),
         daemon=True,
     )
     thread.start()
@@ -225,8 +230,10 @@ def _geofence_error(payload):
         lon = float(payload['lon'])
     except (TypeError, ValueError):
         return 'Invalid location.'
+    if not (math.isfinite(lat) and math.isfinite(lon) and -90 <= lat <= 90 and -180 <= lon <= 180):
+        return 'Invalid location.'
     distance = _distance_m(lat, lon, GATE_LAT, GATE_LON)
-    if distance > GEOFENCE_RADIUS_M:
+    if not distance <= GEOFENCE_RADIUS_M:
         return 'You must be within {:.0f}m of the gate to operate it (you are {:.0f}m away).'.format(
             GEOFENCE_RADIUS_M, distance
         )
